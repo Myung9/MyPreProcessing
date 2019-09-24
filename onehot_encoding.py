@@ -25,6 +25,7 @@ def one_hot_matrix(label_dict):
     return one_hot
 
 result = one_hot_matrix(label_dict)
+print(result)
 
 def get_onehot_label(label):
     for i, one_hot in enumerate(result):

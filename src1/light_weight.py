@@ -216,7 +216,7 @@ def main(argv):
         wx = (ww-w)//2
 
         spc[wy:wy+h, wx:wx+w] = num
-
+        print(spc.shape)
         if h or w < 28:
             num = cv2.resize(spc, (28, 28), interpolation=cv2.INTER_AREA)
         else:
