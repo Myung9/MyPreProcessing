@@ -80,14 +80,14 @@ class ImageProcessingModule():
                                          3, 20)
 
     def blur(self, img_param):
-        return cv2.GaussianBlur(img_param, (5, 5), 0)
+        return cv2.GaussianBlur(img_param, (3, 3), 0)
 
     def morph_gradient(self, img_param):
-        kernel = np.ones((10, 10), np.uint8)
+        kernel = np.ones((4, 5), np.uint8)
         return cv2.morphologyEx(img_param, cv2.MORPH_CLOSE, kernel)
 
     def morph_close(self, img_param):
-        kernel = np.ones((10, 10), np.uint8)
+        kernel = np.ones((5, 5), np.uint8)
         return cv2.morphologyEx(img_param, cv2.MORPH_GRADIENT, kernel)
 
     def canny(self, img_param):
@@ -185,7 +185,7 @@ class ImageProcessing(ImageProcessingModule):
 
         for img_path in img_paths:
             img = cv2.imread(img_path)
-            ori_img = img.copy()
+            #ori_img = img.copy()
             ##########
             #여기서부터 모드 분기?
             ##########
@@ -203,47 +203,85 @@ class ImageProcessing(ImageProcessingModule):
             red_mask[:, :] = [0, 0, 255]
             blue_mask[:, :] = [255, 0, 0]
 
-            mask = cv2.bitwise_and(red_mask, red_mask, mask=bt)
+            ori_img = img.copy()
+            bt_mask = cv2.bitwise_and(red_mask, red_mask, mask=bt)
+            bt_result = cv2.addWeighted(bt_mask, 1, ori_img, 1, 0, ori_img)
+            
+
+            ori_img = img.copy()
+            edge_mask = cv2.bitwise_and(blue_mask, blue_mask, mask=edge)
+            edge_result = cv2.addWeighted(edge_mask, 1, ori_img, 1, 0, ori_img)
+
+
 
             ############여기까지가 기본 default 엣지
 
 
-
-
-
+            '''
             ###이부분은 채널나누는부분##
             img_b, img_g, img_r = cv2.split(ori_img)
             zeros = np.zeros((ori_img.shape[0],ori_img.shape[1]), dtype=ori_img.dtype)
             img_b = cv2.merge([img_b, zeros, zeros])
             img_g = cv2.merge([zeros, img_g, zeros])
             img_r = cv2.merge([zeros, zeros, img_r])
+            '''
 
 
 
             #다음에는 AdaptiveThreshold의 gaussian / meanc 를 모드로 분기하여
-            print_img()
+            print(img_path)
+            #print_img('aaa', bt_result)
+            #print_img('aaa', edge_result)
+            print(img_path.split('.')[-1])
+            file_ext = img_path.split('.')[-1]  # 확장자
+
+            front = '.'.join(img_path.split('.')[:-1])
+            print(front)
+            cv2.imwrite(front + '_bt.' + file_ext, bt_result)
+            cv2.imwrite(front + '_edge.' + file_ext, edge_result)
+
+    def after_processing(self, img_param, after_processing_mode): # for mnist afterprocessing
+        rlt = self.blur(img_param)
+        for _ in range(3):
+            rlt = self.dilation(rlt)
+        return rlt
+
+    def set_empty_margin(self, img_param, margin): # input img : gray scale
+        MARGIN = margin
+        img = img_param
+        h_w = [img_param.shape[0], img_param.shape[1]]
+        default_len = round(max(h_w) * MARGIN)
+        spc = np.zeros((default_len, default_len))
+        dy = (default_len - h_w[0]) // 2
+        dx = (default_len - h_w[1]) // 2
+        spc[dy:dy + h_w[0], dx:dx + h_w[1]] = img
+
+        return spc
 
 
 class SeperateImage(ImageProcessing):
     def __init__(self):
         super().__init__()
         self.img_list = []
-        print('__init__ serperateimage')
 
     def seperate(self, img_param): # seperate preprocessing된 gray 스케일
         ip = ImageProcessing()
-        #processing_img = ip.seperate_preprocessing(img_param, 'BINARY')
+        img = img_param
+        if img_param.shape[2] == 3:
+            img = cv2.cvtColor(img_param, cv2.COLOR_BGR2GRAY)
 
-        #img = cv2.cvtColor(img_param, cv2.COLOR_BGR2GRAY)
-        #img = ip.seperate_preprocessing(img_param, 'BINARY')
-        print('seperate in img_param', img_param)
+        cv2.blur
+        bt = ip.threshold(img, 'BINARY')
+        print(bt)
+        print(bt.shape)
 
-        #print_img('원본이미지', img_param)
-        bt = ip.threshold(img_param, 'BINARY')
+
         blur = ip.blur(bt)
-        mg = ip.morph_gradient(blur)
-        canny = ip.canny(mg)
+
+        canny = ip.canny(blur)
         #print_img('canny edge', canny)
+
+
 
         contours_1, hierarchy_1 = cv2.findContours(canny, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
         convexHull = np.empty(())
@@ -252,9 +290,6 @@ class SeperateImage(ImageProcessing):
             print(i+1, '번째 좌표(1) ', cv2.boundingRect(contour_1))
             hull = cv2. convexHull(contour_1)
             convexHull = cv2.drawContours(canny, [hull], 0, (125, 125, 125))
-            print(type(convexHull))
-            print(convexHull.shape)
-        #print_img('convexhull', convexHull)
         rects = []
         #img_h, img_w = img_param.shape[:2]
         contours_2, hierarchy_2 = cv2.findContours(convexHull, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -262,37 +297,46 @@ class SeperateImage(ImageProcessing):
             x, y, w, h = cv2.boundingRect(contour_2)
             print(i+1, '번째 컨투어스 좌표(2) ', cv2.boundingRect(contour_2))
             cv2.rectangle(img_param, (x, y), (x + w, y + h), (255, 0, 0), 1)
-            #blocking = cv2.drawContours(img, contours_2, -1, (0, 0, 255), 2)
+            #blocking = cv2.drawContours(img_param, contours_2, -1, (0, 0, 255), 2)
             #cv2.line(blocking, (x,y),(x+1,y+1), (0,100,255),3)
             #print_img(blocking)
             rects.append([i, x, y, w, h])
             # 여기서 인덱스를 어떡게할지나 생각해보기 / 그냥놔둘지 바꿀지
             # 인덱스 순서는 왼쪽아래부터 오른쪽으로 확인하면서 위로
         rects = sorted(rects, key=lambda x:x[0])
-        shapes = []
+        result = []
         img_list = []
-
+        print(rects)
         for i, rect in enumerate(rects):
             img_list = self.img_list
             idx, x, y, w, h = rect
+            ########################################################
+            # 이부분에 자르고나서 후처리할 모듈 호출해서 후처리하기#######
+            # 자르는 이미지부분을 후처리한것 넣기 or 자르고나서 후처리하기#
+            #after_img = self.after_processing(bt, 0)
             seperated_img = bt[y:y+h, x:x+w]
             seperated_img = 255 - seperated_img
-            img_list.append(seperated_img)
-            shapes.append(seperated_img.shape)
-            #print_img('ttt', seperated_img)
-        return img_param, img_list, rects # 잘린이미지리스트 // 원본에서의 좌표와 w,h 리스트
+            ########################################################
+
+            seperated_img = self.set_empty_margin(img_param=seperated_img, margin=1.2)
+            seperated_img = self.after_processing(img_param=seperated_img, after_processing_mode=1)
+            ###set_empty_margin에서 넘어오는 이미지는 np의 형태라 astype해준후..ㅇㅇ
+            #np 연산이 필요
+            result_img = np.invert(seperated_img.astype(np.uint8))
+            print_img('a', result_img)
+            result.append(result_img.shape)
+        return result
 
 
 
-#SeperateImage(processing_option=processing_option).seperate(cv2.imread('../images/cat.57.jpg'))
 if __name__ == '__main__':
     processing_option = {
         'order': 'a',
         'DTS_IMG_DEPTH_CD': 1
     }
-    test_img = cv2.imread('../images/5.png')
-    for_sep_img = ImageProcessing().seperate_preprocessing(img_param=test_img, mode=1)
-    SeperateImage().seperate(for_sep_img) # 현라인 포함 위에까지 두줄은 하나로...?
+    #test_img = cv2.imread('../images/5.png')
+    #for_sep_img = ImageProcessing().seperate_preprocessing(img_param=test_img, mode=1)
+    #SeperateImage().seperate(for_sep_img) # 현라인 포함 위에까지 두줄은 하나로...?
     '''
     for (path, dir, files) in os.walk('../images/mnist_sample'):
         for filename in files:
@@ -300,8 +344,15 @@ if __name__ == '__main__':
             if ext == '.png' or '.jpg':
                 print('%s/%s'%(path,filename))
     '''
-    ImageProcessing().cover_edge(img_folder_path='../images', cover_mode=1)
+    
+    SeperateImage().seperate(img_param=cv2.imread('../images/wow.JPG'))
 
+
+'''
+    test_img = cv2.imread('../images/wow.JPG')
+
+    ImageProcessing().set_empty_margin(test_img)
+    '''
 
 
 

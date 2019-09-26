@@ -245,7 +245,7 @@ def main(argv):
 
         imgList.append(num)
         #print('list(2)', np.nditer(imgList))
-        #print('num(2)', np.nditer(num))
+        #print('num(2)', np.nditer(  num))
         #print('rects(2)', np.nditer(rects))
 
         #num = num.reshape(28 * 28)
